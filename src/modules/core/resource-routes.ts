@@ -1,6 +1,6 @@
 import { cleanPayload, getRouteParam, parsePagination, readJson } from "@/lib/api/route-helpers";
 import { ok } from "@/lib/api/responses";
-import { writeAuditLog } from "@/modules/core/audit";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 import { resourceConfigs, type ResourceConfig } from "@/modules/core/resource-config";
 import {
   createRecord,
@@ -32,7 +32,7 @@ export function createCollectionHandlers(resource: ResourceConfig) {
       const payload = cleanPayload(await readJson<Record<string, unknown>>(request));
       const created = await createRecord(resource.table, payload);
 
-      await writeAuditLog({
+      await writeAuditLogSafe({
         action: `${resource.resource}.created`,
         entity_type: resource.table,
         entity_id: String(created.id ?? ""),
@@ -66,7 +66,7 @@ export function createItemHandlers(resource: ResourceConfig) {
       const payload = cleanPayload(await readJson<Record<string, unknown>>(request));
       const row = await updateRecord(resource.table, id, payload);
 
-      await writeAuditLog({
+      await writeAuditLogSafe({
         action: `${resource.resource}.updated`,
         entity_type: resource.table,
         entity_id: id,
@@ -82,7 +82,7 @@ export function createItemHandlers(resource: ResourceConfig) {
       const id = await getRouteParam(context, "id");
       const row = await deleteRecord(resource.table, id);
 
-      await writeAuditLog({
+      await writeAuditLogSafe({
         action: `${resource.resource}.deleted`,
         entity_type: resource.table,
         entity_id: id,

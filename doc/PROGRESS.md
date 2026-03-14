@@ -19,4 +19,5 @@ Format
 [2026-03-14 15:55 IST] Codex - Added AI warehouse slotting optimization with ranked relocation recommendations, optimization APIs, dashboard integration, and the /optimization workflow page.
 [2026-03-14 16:20 IST] Codex - Sanitized deployment configuration by removing live secrets from .env.example and preserving local-only env files for safe Vercel setup.
 [2026-03-14 16:45 IST] Codex - Linked the Vercel project to the GitHub repository for automatic deployments and completed a production deployment with project-level environment variables.
+[2026-03-14 17:30 IST] Codex - Implemented warehouse audit tracking with actor-aware audit events, /api/audit/logs, and an in-app audit trail page for operational activity visibility.
 

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/route";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 
 type AppSupabaseClient = SupabaseClient<any, "public", any>;
 
@@ -25,6 +26,22 @@ export async function listReceipts(client: AppSupabaseClient, input: ListReceivi
 export async function createReceipt(client: AppSupabaseClient, input: CreateReceiptInput) {
   const { data, error } = await client.from("receipts").insert(input).select("*").single();
   throwIfError(error, "Failed to create receipt.");
+
+  await writeAuditLogSafe(
+    {
+      action: "receipt.created",
+      entity_type: "receipts",
+      entity_id: data?.id ?? null,
+      metadata: {
+        vendor_id: input.vendor_id ?? null,
+        warehouse_id: input.warehouse_id ?? null,
+        status: input.status,
+        receipt_number: input.receipt_number ?? null,
+      },
+    },
+    { client },
+  );
+
   return data;
 }
 
@@ -37,11 +54,37 @@ export async function getReceiptById(client: AppSupabaseClient, id: string) {
 export async function updateReceipt(client: AppSupabaseClient, id: string, input: UpdateReceiptInput) {
   const { data, error } = await client.from("receipts").update(input).eq("id", id).select("*").single();
   throwIfError(error, "Failed to update receipt.");
+
+  await writeAuditLogSafe(
+    {
+      action: "receipt.updated",
+      entity_type: "receipts",
+      entity_id: id,
+      metadata: input,
+    },
+    { client },
+  );
+
   return data;
 }
 
 export async function confirmReceipt(client: AppSupabaseClient, receiptId: string) {
-  const { data, error } = await client.from("receipts").update({ status: "received", received_at: new Date().toISOString() }).eq("id", receiptId).select("*").single();
+  const receivedAt = new Date().toISOString();
+  const { data, error } = await client.from("receipts").update({ status: "received", received_at: receivedAt }).eq("id", receiptId).select("*").single();
   throwIfError(error, "Failed to confirm receipt.");
+
+  await writeAuditLogSafe(
+    {
+      action: "receipt.confirmed",
+      entity_type: "receipts",
+      entity_id: receiptId,
+      metadata: {
+        status: "received",
+        received_at: receivedAt,
+      },
+    },
+    { client },
+  );
+
   return data;
 }

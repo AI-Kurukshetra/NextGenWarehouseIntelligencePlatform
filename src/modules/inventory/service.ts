@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/route";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 
 type AppSupabaseClient = SupabaseClient<any, "public", any>;
 
@@ -131,6 +132,24 @@ export async function listInventory(client: AppSupabaseClient, input: ListInvent
 export async function createInventoryLine(client: AppSupabaseClient, input: CreateInventoryInput) {
   const { data, error } = await client.from("inventory").insert(input).select("*").single();
   throwIfError(error, "Failed to create inventory record.");
+
+  await writeAuditLogSafe(
+    {
+      action: "inventory.created",
+      entity_type: "inventory",
+      entity_id: data?.id ?? null,
+      metadata: {
+        product_id: input.product_id,
+        location_id: input.location_id,
+        lot_id: input.lot_id ?? null,
+        quantity: input.quantity,
+        reserved_quantity: input.reserved_quantity,
+        status: input.status,
+      },
+    },
+    { client },
+  );
+
   return data;
 }
 
@@ -161,6 +180,23 @@ export async function adjustInventory(client: AppSupabaseClient, input: AdjustIn
     reason: input.reason ?? "manual-adjustment",
   });
   throwIfError(adjustmentError, "Failed to write adjustment record.");
+
+  await writeAuditLogSafe(
+    {
+      action: "inventory.adjusted",
+      entity_type: "inventory",
+      entity_id: input.inventory_id,
+      metadata: {
+        quantity_delta: input.quantity_delta,
+        previous_quantity: Number(current.quantity ?? 0),
+        next_quantity: nextQuantity,
+        reason: input.reason ?? "manual-adjustment",
+        product_id: current.product_id,
+        location_id: current.location_id,
+      },
+    },
+    { client },
+  );
 
   return updated;
 }
@@ -224,6 +260,24 @@ export async function transferInventory(client: AppSupabaseClient, input: Transf
     throwIfError(error, "Failed to create target inventory.");
     updatedTarget = data;
   }
+
+  await writeAuditLogSafe(
+    {
+      action: "inventory.transferred",
+      entity_type: "inventory",
+      entity_id: input.inventory_id,
+      metadata: {
+        product_id: source.product_id,
+        lot_id: source.lot_id ?? null,
+        from_location_id: source.location_id,
+        to_location_id: input.to_location_id,
+        quantity: input.quantity,
+        source_remaining_quantity: Number(updatedSource.quantity ?? 0),
+        target_inventory_id: updatedTarget?.id ?? null,
+      },
+    },
+    { client },
+  );
 
   return {
     source: updatedSource,

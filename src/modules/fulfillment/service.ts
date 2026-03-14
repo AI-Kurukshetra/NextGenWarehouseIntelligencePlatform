@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/route";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 
 type AppSupabaseClient = SupabaseClient<any, "public", any>;
 
@@ -138,6 +139,21 @@ export async function createWorkflowOrder(client: AppSupabaseClient, input: Crea
     throw new ApiError(400, "Failed to create workflow order items.", itemsError.message);
   }
 
+  await writeAuditLogSafe(
+    {
+      action: "order.created",
+      entity_type: "orders",
+      entity_id: order.id,
+      metadata: {
+        order_number: order.order_number,
+        priority: order.priority,
+        status: order.status,
+        item_count: input.items.length,
+      },
+    },
+    { client },
+  );
+
   return { order, items: items ?? [] };
 }
 
@@ -198,6 +214,21 @@ export async function generatePickList(client: AppSupabaseClient, input: Generat
     .single();
   throwIfError(updateOrderError, "Failed to update order status for pick list.");
 
+  await writeAuditLogSafe(
+    {
+      action: "picking.pick_list_generated",
+      entity_type: "pickings",
+      entity_id: picking?.id ?? null,
+      metadata: {
+        order_id: input.order_id,
+        order_number: order.order_number ?? null,
+        route_code: routeCode,
+        item_count: order.order_items.length,
+      },
+    },
+    { client },
+  );
+
   return {
     order: updatedOrder,
     picking,
@@ -247,6 +278,21 @@ export async function assignPicker(client: AppSupabaseClient, input: AssignPicke
     .single();
   throwIfError(orderError, "Failed to update order after picker assignment.");
 
+  await writeAuditLogSafe(
+    {
+      action: "picking.assigned",
+      entity_type: "pickings",
+      entity_id: input.picking_id,
+      metadata: {
+        order_id: picking.order_id,
+        worker_id: worker.id,
+        worker_name: worker.name,
+        route_code: picking.route_code ?? null,
+      },
+    },
+    { client },
+  );
+
   return { picking, order, worker };
 }
 
@@ -284,6 +330,20 @@ export async function confirmWorkflowPicking(client: AppSupabaseClient, pickingI
     .select("*")
     .single();
   throwIfError(orderError, "Failed to update order after picking confirmation.");
+
+  await writeAuditLogSafe(
+    {
+      action: "picking.confirmed",
+      entity_type: "pickings",
+      entity_id: pickingId,
+      metadata: {
+        order_id: picking.order_id,
+        item_count: orderItems?.length ?? 0,
+        status: "completed",
+      },
+    },
+    { client },
+  );
 
   return { picking: updatedPicking, order };
 }
@@ -344,6 +404,21 @@ export async function packShipment(client: AppSupabaseClient, input: PackShipmen
     .single();
   throwIfError(updatedOrderError, "Failed to update order after packing.");
 
+  await writeAuditLogSafe(
+    {
+      action: "shipment.packed",
+      entity_type: "shipments",
+      entity_id: shipment?.id ?? null,
+      metadata: {
+        order_id: input.order_id,
+        carrier_id: shipment?.carrier_id ?? null,
+        tracking_number: shipment?.tracking_number ?? null,
+        status: shipment?.status ?? "packed",
+      },
+    },
+    { client },
+  );
+
   return { shipment, order: updatedOrder };
 }
 
@@ -359,9 +434,10 @@ export async function shipOrder(client: AppSupabaseClient, input: ShipOrderInput
     throw new ApiError(400, "Shipment must be packed before it can be shipped.");
   }
 
+  const shippedAt = new Date().toISOString();
   const { data: updatedShipment, error: updatedShipmentError } = await client
     .from("shipments")
-    .update({ status: "shipped", shipped_at: new Date().toISOString() })
+    .update({ status: "shipped", shipped_at: shippedAt })
     .eq("id", input.shipment_id)
     .select("*")
     .single();
@@ -374,6 +450,21 @@ export async function shipOrder(client: AppSupabaseClient, input: ShipOrderInput
     .select("*")
     .single();
   throwIfError(orderError, "Failed to update order after shipping.");
+
+  await writeAuditLogSafe(
+    {
+      action: "shipment.shipped",
+      entity_type: "shipments",
+      entity_id: input.shipment_id,
+      metadata: {
+        order_id: shipment.order_id,
+        tracking_number: updatedShipment?.tracking_number ?? null,
+        shipped_at: shippedAt,
+        status: "shipped",
+      },
+    },
+    { client },
+  );
 
   return { shipment: updatedShipment, order };
 }

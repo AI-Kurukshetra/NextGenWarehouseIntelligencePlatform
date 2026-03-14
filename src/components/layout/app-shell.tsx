@@ -88,7 +88,14 @@ function SidebarIcon({ href, active }: NavIconProps) {
         <svg aria-hidden="true" className={cn("h-5 w-5", tone)} fill="none" viewBox="0 0 24 24">
           <path d="M5 17.5 10 12l3 3 6-7M5 6h14M5 20h14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={stroke} />
         </svg>
-      );    case "/inventory/locations":
+      );
+    case "/audit":
+      return (
+        <svg aria-hidden="true" className={cn("h-5 w-5", tone)} fill="none" viewBox="0 0 24 24">
+          <path d="M7 4h8l4 4v11a1 1 0 0 1-1 1H7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm7 0v4h4M9 12h6M9 16h6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={stroke} />
+        </svg>
+      );
+    case "/inventory/locations":
       return (
         <svg aria-hidden="true" className={cn("h-5 w-5", tone)} fill="none" viewBox="0 0 24 24">
           <path d="M12 20s6-5.4 6-10a6 6 0 1 0-12 0c0 4.6 6 10 6 10Zm0-8.5a2.5 2.5 0 1 0 0-.01Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={stroke} />
@@ -345,3 +352,4 @@ export function AppShell({ children, user }: AppShellProps) {
     </div>
   );
 }
+

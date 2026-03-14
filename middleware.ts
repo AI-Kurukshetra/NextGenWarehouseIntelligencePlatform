@@ -11,6 +11,7 @@ const protectedPrefixes = [
   "/picking",
   "/shipping",
   "/optimization",
+  "/audit",
   "/settings",
   "/cycle-counts",
   "/returns",

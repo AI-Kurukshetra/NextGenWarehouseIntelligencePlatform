@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/route";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 
 type AppSupabaseClient = SupabaseClient<any, "public", any>;
 
@@ -25,11 +26,42 @@ export async function listPickings(client: AppSupabaseClient, input: ListPicking
 export async function createPicking(client: AppSupabaseClient, input: CreatePickingInput) {
   const { data, error } = await client.from("pickings").insert({ ...input, started_at: input.started_at ?? new Date().toISOString() }).select("*").single();
   throwIfError(error, "Failed to create picking record.");
+
+  await writeAuditLogSafe(
+    {
+      action: "picking.created",
+      entity_type: "pickings",
+      entity_id: data?.id ?? null,
+      metadata: {
+        order_id: input.order_id,
+        worker_id: input.worker_id ?? null,
+        status: input.status,
+        route_code: input.route_code ?? null,
+      },
+    },
+    { client },
+  );
+
   return data;
 }
 
 export async function confirmPicking(client: AppSupabaseClient, pickingId: string) {
   const { data, error } = await client.from("pickings").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", pickingId).select("*").single();
   throwIfError(error, "Failed to confirm picking.");
+
+  await writeAuditLogSafe(
+    {
+      action: "picking.confirmed",
+      entity_type: "pickings",
+      entity_id: pickingId,
+      metadata: {
+        status: data?.status ?? "completed",
+        order_id: data?.order_id ?? null,
+        worker_id: data?.worker_id ?? null,
+      },
+    },
+    { client },
+  );
+
   return data;
 }

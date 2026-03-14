@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/route";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 
 type AppSupabaseClient = SupabaseClient<any, "public", any>;
 
@@ -25,6 +26,22 @@ export async function listShipments(client: AppSupabaseClient, input: ListShipme
 export async function createShipment(client: AppSupabaseClient, input: CreateShipmentInput) {
   const { data, error } = await client.from("shipments").insert(input).select("*").single();
   throwIfError(error, "Failed to create shipment.");
+
+  await writeAuditLogSafe(
+    {
+      action: "shipment.created",
+      entity_type: "shipments",
+      entity_id: data?.id ?? null,
+      metadata: {
+        order_id: input.order_id,
+        carrier_id: input.carrier_id ?? null,
+        tracking_number: input.tracking_number ?? null,
+        status: input.status,
+      },
+    },
+    { client },
+  );
+
   return data;
 }
 
@@ -37,11 +54,32 @@ export async function getShipmentById(client: AppSupabaseClient, id: string) {
 export async function updateShipment(client: AppSupabaseClient, id: string, input: UpdateShipmentInput) {
   const { data, error } = await client.from("shipments").update(input).eq("id", id).select("*").single();
   throwIfError(error, "Failed to update shipment.");
+
+  await writeAuditLogSafe(
+    {
+      action: "shipment.updated",
+      entity_type: "shipments",
+      entity_id: id,
+      metadata: input,
+    },
+    { client },
+  );
+
   return data;
 }
 
 export async function deleteShipment(client: AppSupabaseClient, id: string) {
   const { error } = await client.from("shipments").delete().eq("id", id);
   throwIfError(error, "Failed to delete shipment.");
+
+  await writeAuditLogSafe(
+    {
+      action: "shipment.deleted",
+      entity_type: "shipments",
+      entity_id: id,
+    },
+    { client },
+  );
+
   return { id };
 }

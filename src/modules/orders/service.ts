@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { ApiError } from "@/lib/api/route";
+import { writeAuditLogSafe } from "@/modules/core/audit";
 
 type AppSupabaseClient = SupabaseClient<any, "public", any>;
 
@@ -34,6 +35,22 @@ export async function createOrder(client: AppSupabaseClient, input: CreateOrderI
     }
     items = data ?? [];
   }
+
+  await writeAuditLogSafe(
+    {
+      action: "order.created",
+      entity_type: "orders",
+      entity_id: order.id,
+      metadata: {
+        order_number: order.order_number,
+        status: order.status,
+        priority: order.priority,
+        item_count: input.items.length,
+      },
+    },
+    { client },
+  );
+
   return { order, items };
 }
 
@@ -46,11 +63,32 @@ export async function getOrderById(client: AppSupabaseClient, id: string) {
 export async function updateOrder(client: AppSupabaseClient, id: string, input: UpdateOrderInput) {
   const { data, error } = await client.from("orders").update(input).eq("id", id).select("*").single();
   throwIfError(error, "Failed to update order.");
+
+  await writeAuditLogSafe(
+    {
+      action: "order.updated",
+      entity_type: "orders",
+      entity_id: id,
+      metadata: input,
+    },
+    { client },
+  );
+
   return data;
 }
 
 export async function deleteOrder(client: AppSupabaseClient, id: string) {
   const { error } = await client.from("orders").delete().eq("id", id);
   throwIfError(error, "Failed to delete order.");
+
+  await writeAuditLogSafe(
+    {
+      action: "order.deleted",
+      entity_type: "orders",
+      entity_id: id,
+    },
+    { client },
+  );
+
   return { id };
 }
